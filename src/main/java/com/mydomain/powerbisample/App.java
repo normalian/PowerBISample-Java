@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Base64.Encoder;
 import java.util.Date;
@@ -44,42 +43,54 @@ public class App {
 	// Reference for using PATCH requests using jersey
 	// http://stackoverflow.com/questions/22355235/patch-request-using-jersey-client
 
+	public static String Rfc4648Base64Encode(String arg) throws UnsupportedEncodingException {
+		Encoder encoder = Base64.getMimeEncoder(0, new byte[0]);
+		String res = encoder.encodeToString(arg.getBytes("UTF-8"));
+		res = res.replace("/", "_");
+		res = res.replace("+", "-");
+		res = res.replace("=", "");
+		return res;
+	}
+
+	public static String Rfc4648Base64Encode(byte[] arg) throws UnsupportedEncodingException {
+		Encoder encoder = Base64.getMimeEncoder(0, new byte[0]);
+		String res = encoder.encodeToString(arg);
+		res = res.replace("/", "_");
+		res = res.replace("+", "-");
+		res = res.replace("=", "");
+		return res;
+	}
+
+	public static String CreateAppToken(String workspaceid, String reportId, String workspaceCollectionName)
+			throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
+		String token1 = "{\"typ\":\"JWT\",\"alg\":\"HS256\"}";
+		String token2 = "{" + //
+				"\"wid\":\"" + workspaceid + "\"," + // workspaceid
+				"\"rid\":\"" + reportId + "\"," + // reportid
+				"\"wcn\":\"" + workspaceCollectionName + "\"," + // workspace
+				// collection name
+				"\"iss\":\"PowerBISDK\"," + //
+				"\"ver\":\"0.2.0\"," + //
+				"\"aud\":\"https://analysis.windows.net/powerbi/api\"," + //
+				"\"nbf\":\"" + (new Date().getTime() / 1000) + "\","//
+				+ "\"exp\":\"" + (new DateTime().plusHours(1).toDate().getTime() / 1000) + "\"}";//
+		String inputval = Rfc4648Base64Encode(token1) + "." + Rfc4648Base64Encode(token2);
+
+		String algo = "HmacSHA256";
+		SecretKeySpec sk = new SecretKeySpec(accessToken.getBytes("UTF-8"), algo);
+		Mac mac = Mac.getInstance(algo);
+		mac.init(sk);
+		byte[] mac_bytes = mac.doFinal(inputval.getBytes("UTF-8"));
+
+		String apptoken = inputval + "." + Rfc4648Base64Encode(mac_bytes);
+		return apptoken;
+	}
+
 	public static void main(String[] args)
 			throws NoSuchAlgorithmException, InvalidKeyException, UnsupportedEncodingException {
-		SimpleDateFormat df = new SimpleDateFormat("MMM dd yyyy HH:mm:ss.SSS zzz");
-		Encoder encoder = Base64.getMimeEncoder(0, new byte[0]);
 		{
-			String token1 = "{\"typ\":\"JWT\",\"alg\":\"HS256\"}";
-			System.out.println("token1 = " + token1);
-
-			String token2 = "{" + //
-					"\"wid\":\"31dde159-7445-436b-bb96-f60f106b5982\"," + // workspaceid
-					"\"rid\":\"ed051151-3a49-4cf3-9bfc-90cb1b25cda1\"," + // reportid
-					"\"wcn\":\"mypowerbicollection01\"," + // workspace
-															// collection name
-					"\"iss\":\"PowerBISDK\"," + //
-					"\"ver\":\"0.2.0\"," + //
-					"\"aud\":\"https://analysis.windows.net/powerbi/api\"," + //
-					"\"nbf\":" + df.format(new Date()) + ","//
-					+ "\"exp\":" + df.format(new DateTime().plusHours(1).toDate()) + "}";//
-			System.out.println("token2 = " + token2);
-
-			String inputval = encoder.encodeToString(token1.getBytes("UTF-8")) + "."
-					+ encoder.encodeToString(token2.getBytes("UTF-8"));
-			inputval = inputval.replace("=", "");
-
-			System.out.println("inputval = " + inputval);
-
-			String algo = "HmacSHA256";
-			SecretKeySpec sk = new SecretKeySpec(accessToken.getBytes("UTF-8"), algo);
-			Mac mac = Mac.getInstance(algo);
-			mac.init(sk);
-			byte[] mac_bytes = mac.doFinal(inputval.getBytes("UTF-8"));
-			String sig = encoder.encodeToString(mac_bytes);
-			System.out.println("sig = " + sig);
-			sig = sig.replace("=", "");
-
-			String apptoken = inputval + "." + sig;
+			String apptoken = CreateAppToken("31dde159-7445-436b-bb96-f60f106b5982",
+					"ed051151-3a49-4cf3-9bfc-90cb1b25cda1", "mypowerbicollection01");
 			System.out.println("apptoken = " + apptoken);
 		}
 	}
